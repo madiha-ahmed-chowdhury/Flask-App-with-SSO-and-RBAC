@@ -15,20 +15,23 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your-secret-key-change-this')
 
-# Authentik OIDC Configuration
-AUTHENTIK_BASE_URL = os.environ.get('AUTHENTIK_BASE_URL', 'http://servert:9000')  # For internal API calls
-AUTHENTIK_PUBLIC_URL = os.environ.get('AUTHENTIK_PUBLIC_URL', 'http://localhost:9000')  # For browser redirects
+# Authentik OIDC Configuration with manual configuration
+AUTHENTIK_BASE_URL = os.environ.get('AUTHENTIK_BASE_URL', 'http://localhost:9000')
+AUTHENTIK_PUBLIC_URL = os.environ.get('AUTHENTIK_PUBLIC_URL', 'http://localhost:9000')
 AUTHENTIK_CLIENT_ID = os.environ.get('AUTHENTIK_CLIENT_ID', 'your-client-id')
 AUTHENTIK_CLIENT_SECRET = os.environ.get('AUTHENTIK_CLIENT_SECRET', 'your-client-secret')
 FLASK_BASE_URL = os.environ.get('FLASK_BASE_URL', 'http://localhost:5000')
 
-# OAuth2 Setup
+# OAuth2 Setup with manual configuration instead of server_metadata_url
 oauth = OAuth(app)
 oauth.register(
     name='authentik',
     client_id=AUTHENTIK_CLIENT_ID,
     client_secret=AUTHENTIK_CLIENT_SECRET,
-    server_metadata_url=f'{AUTHENTIK_BASE_URL}/application/o/flask-app/.well-known/openid-configuration',
+    authorize_url=f'{AUTHENTIK_PUBLIC_URL}/application/o/authorize/',
+    access_token_url=f'{AUTHENTIK_BASE_URL}/application/o/token/',
+    userinfo_endpoint=f'{AUTHENTIK_BASE_URL}/application/o/userinfo/',
+    jwks_uri=f'{AUTHENTIK_BASE_URL}/application/o/flask-app/jwks/',
     client_kwargs={
         'scope': 'openid profile email groups'
     }
@@ -183,7 +186,7 @@ def logout():
     # Perform logout at Authentik
     if access_token:
         try:
-            logout_url = f'{AUTHENTIK_BASE_URL}/application/o/flask-app/end-session/'
+            logout_url = f'{AUTHENTIK_PUBLIC_URL}/application/o/flask-app/end-session/'
             post_logout_redirect_uri = url_for('index', _external=True)
             
             return redirect(f'{logout_url}?post_logout_redirect_uri={post_logout_redirect_uri}')
@@ -349,6 +352,22 @@ def api_user_info():
 def health_check():
     """Health check endpoint"""
     return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()})
+
+@app.route('/debug/config')
+def debug_config():
+    """Debug endpoint to check OAuth configuration"""
+    return jsonify({
+        'authentik_base_url': AUTHENTIK_BASE_URL,
+        'authentik_public_url': AUTHENTIK_PUBLIC_URL,
+        'client_id': AUTHENTIK_CLIENT_ID,
+        'flask_base_url': FLASK_BASE_URL,
+        'oauth_endpoints': {
+            'authorize_url': f'{AUTHENTIK_PUBLIC_URL}/application/o/authorize/',
+            'access_token_url': f'{AUTHENTIK_BASE_URL}/application/o/token/',
+            'userinfo_endpoint': f'{AUTHENTIK_BASE_URL}/application/o/userinfo/',
+            'jwks_uri': f'{AUTHENTIK_BASE_URL}/application/o/flask-app/jwks/'
+        }
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
