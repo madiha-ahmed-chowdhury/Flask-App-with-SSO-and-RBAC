@@ -98,7 +98,7 @@ authentik-flask-sso/
 
 ### Application Architecture Diagram
 
-![Application Architecture](./assets/Architecture%20Diagram.svg)
+![Application Architecture](./assets/Architecture.svg)
 
 **Figure 2: Complete System Architecture with Flask Integration**
 
