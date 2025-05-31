@@ -458,7 +458,7 @@ The application requires a `.env` file in your project root containing database 
 
 1. **Clone the GitHub repository:**
    ```bash
-   git clone https://github.com/madiha-ahmed-chowdhury/Flask-application-with-SSO.git
+   git clone https://github.com/madiha-ahmed-chowdhury/Flask-App-with-SSO-and-RBAC.git
    ```
 
 2. **Verify the project structure:**
