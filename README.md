@@ -520,86 +520,115 @@ Since the `.env` file is not included in the repository (for security reasons), 
 4. **Update the `.env` file with the generated values**
 
 ⚠️ **Security Note**: Never commit the `.env` file to version control as it contains sensitive credentials.
+### Step 4: Configure Authentik Through Web Interface
 
-### Step 3: Start Authentik Services
+Now that Authentik services are running, we'll configure everything through the web interface. This section covers the complete setup from initial configuration to creating users and groups.
 
-1. **Start only Authentik services first (not the Flask app yet):**
-   ```bash
-   docker-compose up -d postgresql redis server worker
-   ```
+#### 4.1: Initial Setup and Admin Account Creation
 
-2. **Wait for services to be healthy (this may take 2-3 minutes):**
-   ```bash
-   docker-compose ps
-   ```
-   All services should show as "healthy" or "running"
+1. **Access Authentik Initial Setup:**
+   - Open your browser and navigate to `http://localhost:9000`
+   - You'll be greeted with the Authentik initial setup wizard
+   - This is a one-time setup process that creates your administrator account
 
-3. **Check logs if there are any issues:**
-   ```bash
-   # Check server logs
-   docker-compose logs -f server
 
-   # Check all services
-   docker-compose logs
-   ```
+2. **Create Administrator Account:**
+   - **Email:** Enter your admin email (e.g., `admin@example.com`)
+   - **Password:** Create a strong password for your admin account
+   - **Confirm Password:** Re-enter the same password
+   - Click **"Create Account"**
 
-### Step 4: Configure Authentik
 
-1. **Access Authentik Web Interface:**
-   - Open your browser and go to `http://localhost:9000`
-   - You'll see the initial setup wizard
+3. **Complete Welcome Setup:**
+   - Follow through the welcome wizard steps
+   - The setup will finalize your Authentik installation
+   - You'll be redirected to the main interface
 
-2. **Complete Initial Setup:**
-   - Create admin account with a strong password
-   - Set admin email address
-   - Complete the welcome setup wizard
 
-3. **Access Admin Interface:**
+#### 4.2: Access Admin Interface
+
+1. **Navigate to Admin Dashboard:**
    - Go to `http://localhost:9000/if/admin/`
-   - Login with your admin credentials
+   - Login with the admin credentials you just created
    - You should see the Authentik administration dashboard
 
-### Step 5: Create User Groups in Authentik
+The admin interface is where you'll configure all authentication settings, manage users, and set up integrations with applications.
 
-Groups are used for role-based access control in the Flask application.
+#### 4.3: Create Custom Property Mapping
 
-1. **Navigate to Directory → Groups**
-2. **Create the following groups:**
+Before creating the provider, we need to set up a custom property mapping. Property mappings define how user attributes (like group memberships) are included in authentication tokens. This specific mapping will allow your Flask app to receive user group information.
 
-   **Administrators Group:**
-   - Name: `Administrators`
-   - Add your admin user to this group
+1. **Navigate to Property Mappings:**
+   - In the admin sidebar, go to **Customization** → **Property Mappings**
+   - This section manages how user data is transformed and sent to applications
 
-   **Managers Group:**
-   - Name: `Managers`
 
-   **Users Group:**
-   - Name: `Users`
+2. **Create New Property Mapping:**
+   - Click **"Create"** button
+   - Select **"OAuth2/OpenID Provider Property Mapping"**
 
-3. **Add your admin user to the Administrators group:**
-   - Click on the `Administrators` group
-   - Go to the "Users" tab
-   - Add your admin user
+![Application Architecture](./assets/Scope%20Mapping.png)
 
-### Step 6: Create OIDC Provider
+**Figure 3: Initial Scope Mapping**
 
-This is the core configuration that enables OIDC authentication for your Flask app.
+3. **Configure Groups Scope Mapping:**
+   Fill in the following details:
 
-1. **Navigate to Applications → Providers**
-2. **Click "Create"**
-3. **Select "OAuth2/OpenID Provider"**
-4. **Configure Provider with these settings:**
+   - **Name:** `Groups Scope Mapping`
+   - **Scope name:** `groups`
+   - **Description:** `Map user groups to OAuth groups scope`
+   - **Expression:** 
+     ```python
+     return [group.name for group in request.user.ak_groups.all()]
+     ```
 
-   **Basic Settings:**
+![Application Architecture](./assets/Architecture.svg)
+
+**Figure 4: Scope mapping property setting**
+
+   **What this does:** This expression retrieves all groups that the authenticated user belongs to and returns them as a list. When your Flask app receives the authentication token, it will include a "groups" claim containing the user's group memberships (like ["Administrators", "Managers"]).
+
+4. **Save the Property Mapping:**
+   - Click **"Create"** to save the mapping
+   - You'll see it listed in the Property Mappings overview
+
+
+#### 4.4: Create OAuth2/OpenID Provider
+
+The provider is the core component that handles the OAuth2/OpenID Connect authentication protocol. It defines how your Flask application will communicate with Authentik for user authentication.
+
+1. **Navigate to Providers:**
+   - Go to **Applications** → **Providers**
+   - Providers define the authentication protocols and settings
+
+
+2. **Create New Provider:**
+   - Click **"Create"** button
+   - Select **"OAuth2/OpenID Provider"**
+
+![Provider Creation](./assets/Provider%20Creation.png)
+
+**Figure 5: Complete System Architecture with Flask Integration**
+
+3. **Configure Provider Settings:**
+
+   **Basic Configuration:**
    - **Name:** `flask-app-provider`
    - **Authorization flow:** `default-authorization-flow (Authorize application)`
    - **Client type:** `Confidential`
-   - **Client ID:** Leave auto-generated (you'll copy this later)
-   - **Client Secret:** Leave auto-generated (you'll copy this later)
+   - **Client ID:** (Leave auto-generated - you'll copy this later)
+   - **Client Secret:** (Leave auto-generated - you'll copy this later)
 
-   **URLs:**
+![Provider Creation](./assets/Provider%20Creation%20Step%202.png)
+
+**Figure 6: Provider Creation**
+   **URLs and Scopes:**
    - **Redirect URIs:** `http://localhost:5000/callback`
-   - **Scopes:** `openid profile email`
+   - **Scopes:** `openid profile email groups`
+
+   Note: The `groups` scope corresponds to our custom property mapping created earlier.
+
+ 
 
    **Token Settings:**
    - **Subject mode:** `Based on the User's hashed ID`
@@ -607,24 +636,151 @@ This is the core configuration that enables OIDC authentication for your Flask a
    - **Access token validity:** `minutes=10`
    - **Refresh token validity:** `days=30`
 
-5. **Click "Create"**
 
-6. **Copy the credentials:**
-   - After creation, copy the `Client ID` and `Client Secret`
-   - You'll need these for the Flask app configuration
+4. **Configure Property Mappings:**
+   In the **Property Mappings** section, select the following mappings:
+   - `authentik default OAuth Mapping: OpenID 'email'`
+   - `authentik default OAuth Mapping: OpenID 'openid'`
+   - `authentik default OAuth Mapping: OpenID 'profile'`
+   - `Groups Scope Mapping` (the custom mapping we created)
 
-### Step 7: Create Application in Authentik
+     
+![Provider Creation](./assets/Provider%20Creation%20Step%203.png)
 
-1. **Navigate to Applications → Applications**
-2. **Click "Create"**
+**Figure 7: Mapping in Provider Creation**
+
+   **Why these mappings matter:** Each mapping tells Authentik what user information to include in the authentication token. The default mappings provide standard user info (email, profile), while our custom mapping adds group membership data.
+
+5. **Create the Provider:**
+   - Click **"Create"** to save the provider
+   - **Important:** Copy and save the **Client ID** and **Client Secret** - you'll need these for your Flask app configuration
+
+   
+
+#### 4.5: Create Application
+
+Applications in Authentik represent the services that users will access through authentication. This links your Flask app to the OAuth provider we just created.
+
+1. **Navigate to Applications:**
+   - Go to **Applications** → **Applications**
+   - This is where you manage all applications that use Authentik for authentication
+
+
+2. **Create New Application:**
+   - Click **"Create"** button
+
 3. **Configure Application:**
    - **Name:** `Flask SSO App`
-   - **Slug:** `flask-app`
-   - **Provider:** Select `flask-app-provider` (created in previous step)
+   - **Slug:** `flask-app` (This creates a URL-friendly identifier)
+   - **Provider:** Select `flask-app-provider` (the provider we just created)
    - **Launch URL:** `http://localhost:5000`
-   - **Open in new tab:** ✅ (optional)
+   - **Open in new tab:** ✅ (optional - opens app in new tab when clicked from Authentik)
+  
+![Application Creation](./assets/Application%20Creation.png)
 
-4. **Click "Create"**
+**Figure 7: Application Creation**
+4. **Save the Application:**
+   - Click **"Create"**
+   - Your Flask app is now registered with Authentik
+
+
+#### 4.6: Create User Groups
+
+Groups are essential for role-based access control. They allow you to organize users and control what features they can access in your Flask application.
+
+1. **Navigate to Groups:**
+   - Go to **Directory** → **Groups**
+   - Groups help organize users and define their roles/permissions
+
+2. **Create Manager Group:**
+   - Click **"Create"** button
+   - **Name:** `Managers`
+   - **Description:** `Users with management privileges`
+   - Click **"Create"**
+
+
+3. **Create User Group:**
+   - Click **"Create"** button again
+   - **Name:** `Users`
+   - **Description:** `Standard application users`
+   - Click **"Create"**
+
+
+4. **Verify Groups Created:**
+   - You should now see both groups in the groups list
+   - Note that there's also an `Administrators` group (created automatically) which contains your admin user
+
+**Group Purpose:** These groups will be passed to your Flask application through the authentication token. Your Flask app can then use these group memberships to determine what features each user can access.
+
+#### 4.7: Create Additional Users
+
+Now we'll create some test users and assign them to different groups to demonstrate role-based access.
+
+1. **Navigate to Users:**
+   - Go to **Directory** → **Users**
+   - This is where you manage all user accounts
+
+
+2. **Create Manager User:**
+   - Click **"Create"** button
+   - **Username:** `manager1`
+   - **Name:** `Manager User`
+   - **Email:** `manager@example.com`
+   - **Password:** Set a temporary password
+   - Click **"Create"**
+
+
+3. **Create Standard User:**
+   - Click **"Create"** button again
+   - **Username:** `user1`
+   - **Name:** `Standard User`
+   - **Email:** `user@example.com`
+   - **Password:** Set a temporary password
+   - Click **"Create"**
+
+
+#### 4.8: Assign Users to Groups
+
+Now we'll assign our new users to their respective groups. This step is crucial for testing role-based access in your Flask application.
+
+1. **Assign Manager to Managers Group:**
+   - Go to **Directory** → **Groups**
+   - Click on the **"Managers"** group
+   - Go to the **"Users"** tab
+   - Click **"Add existing user"**
+   - Select `manager1` and click **"Add"**
+
+   
+2. **Assign User to Users Group:**
+   - Go back to the Groups list
+   - Click on the **"Users"** group  
+   - Go to the **"Users"** tab
+   - Click **"Add existing user"**
+   - Select `user1` and click **"Add"**
+
+3. **Verify Group Assignments:**
+   - Check that each user appears in their respective group
+   - Your admin user should remain in the `Administrators` group
+
+
+#### 4.9: Note Your Configuration Details
+
+Before moving to the Flask app setup, make sure you have these details saved:
+
+**Provider Credentials:**
+- **Client ID:** `[Copy from your provider settings]`
+- **Client Secret:** `[Copy from your provider settings]`
+- **Authorization Endpoint:** `http://localhost:9000/application/o/authorize/`
+- **Token Endpoint:** `http://localhost:9000/application/o/token/`
+- **User Info Endpoint:** `http://localhost:9000/application/o/userinfo/`
+
+**Test Users:**
+- Admin: `[your-admin-email]` (Administrators group)
+- Manager: `manager1` (Managers group)  
+- User: `user1` (Users group)
+
+
+---
 
 ### Step 8: Update Environment Configuration
 
