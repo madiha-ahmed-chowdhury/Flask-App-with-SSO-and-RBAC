@@ -567,7 +567,7 @@ Before creating the provider, we need to set up a custom property mapping. Prope
    - Click **"Create"** button
    - Select **"OAuth2/OpenID Provider Property Mapping"**
 
-![Application Architecture](./assets/Scope%20Mapping.png)
+![Scope Mapping](./assets/Scope%20Mapping.png)
 
 **Figure 3: Initial Scope Mapping**
 
@@ -582,7 +582,7 @@ Before creating the provider, we need to set up a custom property mapping. Prope
      return [group.name for group in request.user.ak_groups.all()]
      ```
 
-![Application Architecture](./assets/Architecture.svg)
+![Scope Mapping](./assets/Custom%20Group%20Scope%20Mapping.png)
 
 **Figure 4: Scope mapping property setting**
 
